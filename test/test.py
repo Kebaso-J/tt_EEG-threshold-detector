@@ -48,6 +48,14 @@ async def send_sample(dut, value: int):
     await settle(dut)  # so uo_out reflects the FSM update for this sample
 
 
+def read_internal_signal(handle, name: str):
+    """Best-effort read for internal DUT signals that may be absent in gate-level netlists."""
+    try:
+        return getattr(handle, name).value
+    except AttributeError:
+        return "<unavailable>"
+
+
 @cocotb.test()
 async def test_threshold_detector(dut):
     """EEG-style digital threshold detector: hysteresis, debounce, and refractory behaviour."""
@@ -72,16 +80,20 @@ async def test_threshold_detector(dut):
     dut._log.info("Configuring registers: th_high=100, th_low=60, debounce=3, refractory=5")
 
     await write_config(dut, CFG_TH_HIGH, TH_HIGH)
-    dut._log.info(f"th_high after write = {dut.user_project.th_high.value}")
+    dut._log.info(f"th_high after write = {read_internal_signal(dut.user_project, 'th_high')}")
 
     await write_config(dut, CFG_TH_LOW, TH_LOW)
-    dut._log.info(f"th_low after write = {dut.user_project.th_low.value}")
+    dut._log.info(f"th_low after write = {read_internal_signal(dut.user_project, 'th_low')}")
 
     await write_config(dut, CFG_DEBOUNCE, DEBOUNCE)
-    dut._log.info(f"debounce_limit after write = {dut.user_project.debounce_limit.value}")
+    dut._log.info(
+        f"debounce_limit after write = {read_internal_signal(dut.user_project, 'debounce_limit')}"
+    )
 
     await write_config(dut, CFG_REFRACTORY, REFRACTORY)
-    dut._log.info(f"refractory_len after write = {dut.user_project.refractory_len.value}")
+    dut._log.info(
+        f"refractory_len after write = {read_internal_signal(dut.user_project, 'refractory_len')}"
+    )
 
     # --- Baseline: low samples should never trigger detection ---
     dut._log.info("Stage 1: driving baseline low samples, expecting no detection")
@@ -99,8 +111,8 @@ async def test_threshold_detector(dut):
     for _ in range(DEBOUNCE + 1):
         await send_sample(dut, 150)
         dut._log.info(
-            f"sample=150 -> state={dut.user_project.state.value}, "
-            f"above_count={dut.user_project.above_count.value}, "
+            f"sample=150 -> state={read_internal_signal(dut.user_project, 'state')}, "
+            f"above_count={read_internal_signal(dut.user_project, 'above_count')}, "
             f"uo_out={dut.uo_out.value}"
         )
     assert dut.uo_out.value[0] == 1, "Should assert event_detected after debounce period"
