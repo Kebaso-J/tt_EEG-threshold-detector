@@ -44,4 +44,78 @@ jobs:
       pages: write # to deploy to Pages
       id-token: write # to verify the deployment originates from an appropriate source
     steps:
-      - uses: TinyTapeout/tt-gds-action/viewer@ttihp26b
+      - name: Download GDS artifact
+        uses: actions/download-artifact@v7
+        with:
+          name: tt_submission
+
+      - name: Read PDK information from submission
+        shell: bash
+        working-directory: tt_submission
+        run: |
+          PDK=$(jq -r '.PDK' pdk.json)
+          echo "PDK=$PDK" >> "$GITHUB_ENV"
+
+      - name: Download gds_render (png) artifact
+        uses: actions/download-artifact@v7
+        with:
+          name: gds_render
+          path: gh-pages
+
+      - name: Copy OAS and GDSII
+        shell: bash
+        run: |
+          cp tt_submission/*.gds gh-pages/tinytapeout.gds
+          cp tt_submission/*.oas gh-pages/tinytapeout.oas
+
+      - name: Generate HTML redirect page
+        shell: bash
+        run: |
+          cat << EOF > gh-pages/index.html
+            <!DOCTYPE html>
+            <html lang="en">
+            <head>
+              <meta charset="UTF-8">
+              <meta http-equiv="X-UA-Compatible" content="IE=edge">
+              <meta name="viewport" content="width=device-width, initial-scale=1.0">
+              <title>Redirecting to 3D Viewer...</title>
+            </head>
+            <body>
+              <script>
+                location.href = "https://gds-viewer.tinytapeout.com/?pdk=${{ env.PDK }}&model=" + encodeURIComponent(location.href + '/tinytapeout.oas');
+              </script>
+            </body>
+            </html>
+          EOF
+
+      - name: Set unique Pages artifact name
+        shell: bash
+        run: echo "PAGES_ARTIFACT_NAME=github-pages-${{ github.run_attempt }}" >> "$GITHUB_ENV"
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v5
+        with:
+          name: ${{ env.PAGES_ARTIFACT_NAME }}
+          path: gh-pages
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v5
+        with:
+          artifact_name: ${{ env.PAGES_ARTIFACT_NAME }}
+
+      - name: Display preview in workflow summary
+        shell: bash
+        run: |
+          PAGE_URL=${{ steps.deployment.outputs.page_url }}
+          PAGE_URL=$(echo "$PAGE_URL" | sed -e 's/\/$//')
+          cat << EOF >> "$GITHUB_STEP_SUMMARY"
+          # 3D Viewer
+          [Open 3D viewer](https://gds-viewer.tinytapeout.com/?model=$PAGE_URL/tinytapeout.oas&pdk=$PDK)
+
+          # Tiny Tapeout Explorer
+          [Open in Tiny Tapeout Explorer](https://gds-explorer.tinytapeout.com/viewer?file=$PAGE_URL/tinytapeout.oas&pdk=$PDK)
+
+          # 2D Preview
+          ![png]($PAGE_URL/gds_render.png)
+          EOF
