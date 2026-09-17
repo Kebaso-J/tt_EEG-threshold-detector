@@ -5,8 +5,6 @@ This project is a digital threshold-crossing event detector with hysteresis and 
 
 The motivation comes from wearable seizure-detection hardware. A common building block in EEG-based seizure onset detectors is a threshold-crossing detector: raise a flag when a signal feature (raw amplitude, line length, band energy, etc.) exceeds a threshold for long enough to be a real event rather than noise, and only clear that flag once the signal has genuinely settled back down — not the instant it dips below the trigger point. That "settle back down" behaviour is hysteresis, and doing it with two separate thresholds (a high arming threshold and a lower re-arming threshold) is exactly how an analog Schmitt trigger comparator behaves, except implemented here entirely in synchronous digital logic.
 
-No analog pins are used anywhere in this design. All thresholding, hysteresis, and timing logic is implemented as ordinary synthesizable Verilog operating on an 8-bit digital sample bus. This keeps the design low-risk for a first tapeout (fully simulatable and testable with cocotb before submission) while still directly modelling a real analog behaviour in the digital domain.
-
 The project is intended as a standalone building block that could later feed into a larger seizure-detection or neural-event-detection pipeline — the output is a simple digital flag that a downstream microcontroller or state machine can act on (log the event, trigger an alert, wake up a higher-power processing stage, etc.).
 
 ## How it works
